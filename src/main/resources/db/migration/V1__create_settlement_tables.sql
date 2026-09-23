@@ -3,7 +3,7 @@ CREATE TABLE settlement_runs(
     available_settlement_balance NUMERIC(20,4) NOT NULL CHECK (available_settlement_balance >= 0),
     total_settlement_consumed  NUMERIC(20,4 ) NOT NULL CHECK (total_settlement_consumed >= 0 AND total_settlement_consumed <= available_settlement_balance),
     total_expected_fee NUMERIC(20,4) NOT NULL CHECK (total_expected_fee >= 0),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL
 );
 
 CREATE TABLE settlement_instructions (
