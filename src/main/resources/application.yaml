@@ -1,3 +1,13 @@
 spring:
   application:
     name: settlement-funding
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/settlement_funding}
+    username: ${DB_USERNAME:settlement}
+    password: ${DB_PASSWORD:settlement}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
