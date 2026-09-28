@@ -22,12 +22,17 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SettlementService {
 
+    public record FundingOutcome(
+            FundingResponse response,
+            boolean nothingFits
+    ) {}
+
     private final FundingSelector fundingSelector;
     private final SettlementRunRepository runRepository;
     private final SettlementInstructionRepository instructionRepository;
 
     @Transactional
-    public FundingResponse fund(FundingRequest request) {
+    public FundingOutcome fund(FundingRequest request) {
         FundingSelection selection = fundingSelector.select(
                 request.availableSettlementBalance(),
                 request.candidateInstructions()
@@ -48,9 +53,14 @@ public class SettlementService {
         List<CandidateInstruction> selectedInstructions = new ArrayList<>();
 
         List<CandidateInstruction> candidates = request.candidateInstructions();
+        boolean nothingFits = true;
 
         for (int index = 0; index < candidates.size(); index++) {
             CandidateInstruction candidate = candidates.get(index);
+            if (candidate.instructionAmount()
+                    .compareTo(request.availableSettlementBalance()) <= 0) {
+                nothingFits = false;
+            }
             boolean selected = selectedIndexes.contains(index);
 
             instructions.add(new SettlementInstruction(
@@ -68,12 +78,13 @@ public class SettlementService {
 
         instructionRepository.saveAll(instructions);
 
-        return new FundingResponse(
+        FundingResponse response = new FundingResponse(
                 run.getId(),
                 List.copyOf(selectedInstructions),
                 run.getTotalSettlementConsumed(),
                 run.getTotalExpectedFee(),
                 run.getCreatedAt()
         );
+        return new FundingOutcome(response, nothingFits);
     }
 }
