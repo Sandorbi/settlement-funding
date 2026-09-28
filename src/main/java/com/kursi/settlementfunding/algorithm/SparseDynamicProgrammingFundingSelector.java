@@ -1,6 +1,7 @@
 package com.kursi.settlementfunding.algorithm;
 
 import com.kursi.settlementfunding.dto.CandidateInstruction;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Component
 public class SparseDynamicProgrammingFundingSelector implements FundingSelector {
 
     private record State(
@@ -63,9 +65,7 @@ public class SparseDynamicProgrammingFundingSelector implements FundingSelector 
         );
     }
 
-    private TreeMap<BigDecimal, State> keepUsefulCombinations(
-            TreeMap<BigDecimal, State> combinations
-    ) {
+    private TreeMap<BigDecimal, State> keepUsefulCombinations (TreeMap<BigDecimal, State> combinations) {
         TreeMap<BigDecimal, State> useful = new TreeMap<>();
         BigDecimal highestFee = null;
 
