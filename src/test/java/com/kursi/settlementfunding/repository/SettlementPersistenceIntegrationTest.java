@@ -1,9 +1,7 @@
-package com.kursi.settlementfunding;
+package com.kursi.settlementfunding.repository;
 
 import com.kursi.settlementfunding.entity.SettlementInstruction;
 import com.kursi.settlementfunding.entity.SettlementRun;
-import com.kursi.settlementfunding.repository.SettlementInstructionRepository;
-import com.kursi.settlementfunding.repository.SettlementRunRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Transactional
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-public class SettlementPersistanceIntegrationTest {
+public class SettlementPersistenceIntegrationTest {
 
     @Container
     @ServiceConnection

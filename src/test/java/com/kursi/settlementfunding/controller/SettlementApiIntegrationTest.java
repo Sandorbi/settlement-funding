@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
@@ -19,6 +20,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -44,6 +48,9 @@ class SettlementApiIntegrationTest {
 
     @Autowired
     private SettlementInstructionRepository instructionRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void cleanDatabase() {
@@ -204,5 +211,98 @@ class SettlementApiIntegrationTest {
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.title").value("Funding run not found"))
                 .andExpect(jsonPath("$.detail", containsString(requestId)));
+    }
+
+    @Test
+    void shouldReturnEmptyHistoryWithDefaultPagination() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    void shouldReturnHistoryNewestFirstAcrossPages() throws Exception {
+        SettlementRun olderRun = runRepository.saveAndFlush(
+                new SettlementRun(
+                        new BigDecimal("10"),
+                        new BigDecimal("7"),
+                        new BigDecimal("4")
+                )
+        );
+
+        SettlementRun newerRun = runRepository.saveAndFlush(
+                new SettlementRun(
+                        new BigDecimal("20"),
+                        new BigDecimal("6"),
+                        new BigDecimal("3")
+                )
+        );
+
+        // Fixed timestamps make the expected order independent of execution speed.
+        jdbcTemplate.update(
+                "UPDATE settlement_runs SET created_at = ? WHERE id = ?",
+                Timestamp.from(Instant.parse("2026-09-07T09:00:00Z")),
+                olderRun.getId()
+        );
+        jdbcTemplate.update(
+                "UPDATE settlement_runs SET created_at = ? WHERE id = ?",
+                Timestamp.from(Instant.parse("2026-09-08T09:00:00Z")),
+                newerRun.getId()
+        );
+
+        instructionRepository.saveAll(List.of(
+                new SettlementInstruction(
+                        olderRun, "OLDER-SELECTED",
+                        new BigDecimal("7"), new BigDecimal("4"), true
+                ),
+                new SettlementInstruction(
+                        newerRun, "NEWER-SELECTED",
+                        new BigDecimal("6"), new BigDecimal("3"), true
+                ),
+                new SettlementInstruction(
+                        newerRun, "NEWER-UNSELECTED",
+                        new BigDecimal("21"), new BigDecimal("5"), false
+                )
+        ));
+
+        // First page: only the newer run and its selected instruction.
+        mockMvc.perform(get("/api/v1/settlement")
+                        .param("page", "0")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].requestId").value(newerRun.getId().toString()))
+                .andExpect(jsonPath("$.content[0].createdAt").value("2026-09-08T09:00:00Z"))
+                .andExpect(jsonPath("$.content[0].selectedInstructions.length()").value(1))
+                .andExpect(jsonPath("$.content[0].selectedInstructions[0].instructionReference")
+                        .value("NEWER-SELECTED"))
+                .andExpect(jsonPath("$.content[0].totalSettlementConsumed").value(6))
+                .andExpect(jsonPath("$.content[0].totalExpectedFee").value(3));
+
+        // Second page: only the older run and its selected instruction.
+        mockMvc.perform(get("/api/v1/settlement")
+                        .param("page", "1")
+                        .param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].requestId").value(olderRun.getId().toString()))
+                .andExpect(jsonPath("$.content[0].createdAt").value("2026-09-07T09:00:00Z"))
+                .andExpect(jsonPath("$.content[0].selectedInstructions.length()").value(1))
+                .andExpect(jsonPath("$.content[0].selectedInstructions[0].instructionReference")
+                        .value("OLDER-SELECTED"))
+                .andExpect(jsonPath("$.content[0].totalSettlementConsumed").value(7))
+                .andExpect(jsonPath("$.content[0].totalExpectedFee").value(4));
     }
 }

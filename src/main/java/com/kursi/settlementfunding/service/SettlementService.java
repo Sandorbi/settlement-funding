@@ -3,6 +3,7 @@ package com.kursi.settlementfunding.service;
 import com.kursi.settlementfunding.algorithm.FundingSelection;
 import com.kursi.settlementfunding.algorithm.FundingSelector;
 import com.kursi.settlementfunding.dto.CandidateInstruction;
+import com.kursi.settlementfunding.dto.FundingHistoryResponse;
 import com.kursi.settlementfunding.dto.FundingRequest;
 import com.kursi.settlementfunding.dto.FundingResponse;
 import com.kursi.settlementfunding.entity.SettlementInstruction;
@@ -12,13 +13,18 @@ import com.kursi.settlementfunding.exception.FundingRunNotFoundException;
 import com.kursi.settlementfunding.repository.SettlementInstructionRepository;
 import com.kursi.settlementfunding.repository.SettlementRunRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -62,6 +68,63 @@ public class SettlementService {
                 run.getTotalSettlementConsumed(),
                 run.getTotalExpectedFee(),
                 run.getCreatedAt()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public FundingHistoryResponse getFundingHistory(int page, int size) {
+        PageRequest pageRequest = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
+        );
+
+        Page<SettlementRun> runPage = runRepository.findAll(pageRequest);
+
+        List<UUID> runIds = new ArrayList<>();
+        for (SettlementRun run : runPage.getContent()) {
+            runIds.add(run.getId());
+        }
+
+        Map<UUID, List<CandidateInstruction>> instructionsByRun = new HashMap<>();
+
+        if (!runIds.isEmpty()) {
+            List<SettlementInstruction> instructions = instructionRepository
+                    .findAllByRun_IdInAndSelectedTrueOrderByIdAsc(runIds);
+
+            for (SettlementInstruction instruction : instructions) {
+                UUID runId = instruction.getRun().getId();
+                List<CandidateInstruction> selected = instructionsByRun.computeIfAbsent(runId, k -> new ArrayList<>());
+
+                selected.add(new CandidateInstruction(
+                        instruction.getInstructionReference(),
+                        instruction.getInstructionAmount(),
+                        instruction.getExpectedFee()
+                ));
+            }
+        }
+
+        List<FundingResponse> results = new ArrayList<>();
+
+        for (SettlementRun run : runPage.getContent()) {
+            List<CandidateInstruction> selected =
+                    instructionsByRun.getOrDefault(run.getId(), List.of());
+
+            results.add(new FundingResponse(
+                    run.getId(),
+                    List.copyOf(selected),
+                    run.getTotalSettlementConsumed(),
+                    run.getTotalExpectedFee(),
+                    run.getCreatedAt()
+            ));
+        }
+
+        return new FundingHistoryResponse(
+                results,
+                runPage.getNumber(),
+                runPage.getSize(),
+                runPage.getTotalElements(),
+                runPage.getTotalPages()
         );
     }
 

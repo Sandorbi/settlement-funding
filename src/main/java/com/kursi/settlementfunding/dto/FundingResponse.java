@@ -11,8 +11,8 @@ public record FundingResponse(
         BigDecimal totalSettlementConsumed,
         BigDecimal totalExpectedFee,
         Instant createdAt
-
-
-
 ) {
+    public FundingResponse {
+        selectedInstructions = List.copyOf(selectedInstructions);
+    }
 }
