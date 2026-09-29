@@ -77,6 +77,16 @@ public class GlobalExceptionHandler {
         return badRequest(exception.getMessage());
     }
 
+    @ExceptionHandler(PaginationLimitExceededException.class)
+    public ProblemDetail handlePaginationLimit(PaginationLimitExceededException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage()
+        );
+        problem.setTitle("Pagination limit exceeded");
+        return problem;
+    }
+
     private ProblemDetail badRequest(String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setTitle("Invalid funding request");

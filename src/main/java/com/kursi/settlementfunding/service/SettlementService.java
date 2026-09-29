@@ -10,6 +10,7 @@ import com.kursi.settlementfunding.entity.SettlementInstruction;
 import com.kursi.settlementfunding.entity.SettlementRun;
 import com.kursi.settlementfunding.exception.FundingLimitExceededException;
 import com.kursi.settlementfunding.exception.FundingRunNotFoundException;
+import com.kursi.settlementfunding.exception.PaginationLimitExceededException;
 import com.kursi.settlementfunding.repository.SettlementInstructionRepository;
 import com.kursi.settlementfunding.repository.SettlementRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -78,6 +79,13 @@ public class SettlementService {
                 size,
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))
         );
+
+        if (pageRequest.getOffset() > Integer.MAX_VALUE) {
+            throw new PaginationLimitExceededException(
+                    "Page is too large for the requested size. With size " + size
+                            + ", page must not exceed " + Integer.MAX_VALUE / size + "."
+            );
+        }
 
         Page<SettlementRun> runPage = runRepository.findAll(pageRequest);
 
