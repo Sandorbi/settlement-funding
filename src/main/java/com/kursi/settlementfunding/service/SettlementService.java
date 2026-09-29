@@ -7,6 +7,7 @@ import com.kursi.settlementfunding.dto.FundingRequest;
 import com.kursi.settlementfunding.dto.FundingResponse;
 import com.kursi.settlementfunding.entity.SettlementInstruction;
 import com.kursi.settlementfunding.entity.SettlementRun;
+import com.kursi.settlementfunding.exception.FundingLimitExceededException;
 import com.kursi.settlementfunding.repository.SettlementInstructionRepository;
 import com.kursi.settlementfunding.repository.SettlementRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -21,6 +23,9 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class SettlementService {
+
+    private static final BigDecimal MAX_TOTAL_FEE =
+            new BigDecimal("9999999999999999.9999");
 
     public record FundingOutcome(
             FundingResponse response,
@@ -37,6 +42,13 @@ public class SettlementService {
                 request.availableSettlementBalance(),
                 request.candidateInstructions()
         );
+
+        if (selection.totalExpectedFee().compareTo(MAX_TOTAL_FEE) > 0) {
+            throw new FundingLimitExceededException(
+                    "The selected instructions' total expected fee exceeds the supported maximum of "
+                            + MAX_TOTAL_FEE.toPlainString()
+            );
+        }
 
         SettlementRun run = new SettlementRun(
                 request.availableSettlementBalance(),

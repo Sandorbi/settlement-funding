@@ -11,6 +11,7 @@ public record CandidateInstruction(
 
         @NotNull
         @Positive
+        @Digits(integer = 16, fraction = 4)
         BigDecimal instructionAmount,
 
         @NotNull
