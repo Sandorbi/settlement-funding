@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -35,6 +36,46 @@ class FundingValidationTest {
                 instructionRepository
         );
         mockMvc = MockMvcBuilders.standaloneSetup(new SettlementController(service)).setControllerAdvice(new GlobalExceptionHandler()).build();
+    }
+
+    @Test
+    void shouldRejectNegativeHistoryPage() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement").param("page", "-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("page")));
+        verifyNoInteractions(runRepository, instructionRepository);
+    }
+
+    @Test
+    void shouldRejectZeroHistorySize() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("size")));
+        verifyNoInteractions(runRepository, instructionRepository);
+    }
+
+    @Test
+    void shouldRejectHistorySizeOverMaximum() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement").param("size", "101"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("size")));
+        verifyNoInteractions(runRepository, instructionRepository);
+    }
+
+    @Test
+    void shouldRejectNonNumericHistoryPage() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement").param("page", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("valid integer")));
+        verifyNoInteractions(runRepository, instructionRepository);
+    }
+
+    @Test
+    void shouldRejectInvalidRunIdFormat() throws Exception {
+        mockMvc.perform(get("/api/v1/settlement/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("valid UUID")));
+        verifyNoInteractions(runRepository, instructionRepository);
     }
 
     @Test
