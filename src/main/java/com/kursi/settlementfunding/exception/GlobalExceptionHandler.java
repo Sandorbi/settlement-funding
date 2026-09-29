@@ -45,4 +45,14 @@ public class GlobalExceptionHandler {
         problem.setTitle("Invalid funding request");
         return problem;
     }
+
+    @ExceptionHandler(FundingRunNotFoundException.class)
+    public ProblemDetail handleFundingRunNotFound(FundingRunNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND,
+                exception.getMessage()
+        );
+        problem.setTitle("Funding run not found");
+        return problem;
+    }
 }

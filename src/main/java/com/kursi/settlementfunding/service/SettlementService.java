@@ -8,6 +8,7 @@ import com.kursi.settlementfunding.dto.FundingResponse;
 import com.kursi.settlementfunding.entity.SettlementInstruction;
 import com.kursi.settlementfunding.entity.SettlementRun;
 import com.kursi.settlementfunding.exception.FundingLimitExceededException;
+import com.kursi.settlementfunding.exception.FundingRunNotFoundException;
 import com.kursi.settlementfunding.repository.SettlementInstructionRepository;
 import com.kursi.settlementfunding.repository.SettlementRunRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +37,33 @@ public class SettlementService {
     private final FundingSelector fundingSelector;
     private final SettlementRunRepository runRepository;
     private final SettlementInstructionRepository instructionRepository;
+
+    @Transactional(readOnly = true)
+    public FundingResponse getById(UUID requestId) {
+        SettlementRun run = runRepository.findById(requestId)
+                .orElseThrow(() -> new FundingRunNotFoundException(requestId));
+
+        List<SettlementInstruction> instructions =
+                instructionRepository.findAllByRun_IdAndSelectedTrue(requestId);
+
+        List<CandidateInstruction> selectedInstructions = new ArrayList<>();
+
+        for (SettlementInstruction instruction : instructions) {
+            selectedInstructions.add(new CandidateInstruction(
+                    instruction.getInstructionReference(),
+                    instruction.getInstructionAmount(),
+                    instruction.getExpectedFee()
+            ));
+        }
+
+        return new FundingResponse(
+                run.getId(),
+                List.copyOf(selectedInstructions),
+                run.getTotalSettlementConsumed(),
+                run.getTotalExpectedFee(),
+                run.getCreatedAt()
+        );
+    }
 
     @Transactional
     public FundingOutcome fund(FundingRequest request) {
