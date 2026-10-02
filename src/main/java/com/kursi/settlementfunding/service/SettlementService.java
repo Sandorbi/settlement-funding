@@ -138,10 +138,41 @@ public class SettlementService {
 
     @Transactional
     public FundingOutcome fund(FundingRequest request) {
+
+        List<CandidateInstruction> candidates = new ArrayList<>(request.candidateInstructions());
         FundingSelection selection = fundingSelector.select(
                 request.availableSettlementBalance(),
-                request.candidateInstructions()
+                candidates
         );
+
+        if(selection.totalSettlementConsumed().compareTo(request.availableSettlementBalance()) < 0) {
+            List<SettlementInstruction> unusedInstructions = instructionRepository.findAllBySelectedFalse();
+            List<CandidateInstruction> unusedCandidates = new ArrayList<>();
+            for(SettlementInstruction instruction : unusedInstructions) {
+                unusedCandidates.add(new CandidateInstruction(instruction.getInstructionReference(),
+                        instruction.getInstructionAmount(),
+                        instruction.getExpectedFee()));
+            }
+
+            BigDecimal remainingBalance = request.availableSettlementBalance().subtract(selection.totalSettlementConsumed());
+
+            FundingSelection newSelection = fundingSelector.select(remainingBalance, unusedCandidates);
+
+            List<Integer> combinedIndexes = new ArrayList<>(selection.selectedIndexes());
+            int candidateOffset = candidates.size();
+            for (int index : newSelection.selectedIndexes()) {
+                unusedInstructions.get(index).markSelected();
+                combinedIndexes.add(candidateOffset + index);
+            }
+            candidates.addAll(unusedCandidates);
+
+            selection = new FundingSelection(
+                    combinedIndexes,
+                    selection.totalSettlementConsumed().add(newSelection.totalSettlementConsumed()),
+                    selection.totalExpectedFee().add(newSelection.totalExpectedFee())
+            );
+        }
+
 
         if (selection.totalExpectedFee().compareTo(MAX_TOTAL_FEE) > 0) {
             throw new FundingLimitExceededException(
@@ -164,7 +195,6 @@ public class SettlementService {
         List<SettlementInstruction> instructions = new ArrayList<>();
         List<CandidateInstruction> selectedInstructions = new ArrayList<>();
 
-        List<CandidateInstruction> candidates = request.candidateInstructions();
         boolean nothingFits = true;
 
         for (int index = 0; index < candidates.size(); index++) {

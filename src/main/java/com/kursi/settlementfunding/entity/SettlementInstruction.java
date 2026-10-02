@@ -32,6 +32,10 @@ public class SettlementInstruction {
     @Column(name = "selected", nullable = false)
     private boolean selected;
 
+    public void markSelected() {
+        this.selected = true;
+    }
+
     public SettlementInstruction(
             SettlementRun run,
             String instructionReference,

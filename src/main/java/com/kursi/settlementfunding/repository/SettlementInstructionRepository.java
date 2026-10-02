@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface SettlementInstructionRepository extends JpaRepository<SettlementInstruction, Long> {
 
     List<SettlementInstruction> findAllByRun_IdAndSelectedTrue(UUID runId);
+    List<SettlementInstruction> findAllBySelectedFalse();
+
 
     List<SettlementInstruction> findAllByRun_IdInAndSelectedTrueOrderByIdAsc(
             List<UUID> runIds
